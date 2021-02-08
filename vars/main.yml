@@ -2,7 +2,7 @@ postgresql_databases:
   - name: mydb
 postgresql_users:
   - name: myuser
-    password: mnbv1234
+    password: {{ password }}
     db: mydb
     priv: ALL
     role_attr_flags: SUPERUSER
