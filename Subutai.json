@@ -6,7 +6,7 @@
   "containers": [
     {
       "hostname": "${hostname}",
-      "template": "debian-buaster",
+      "template": "debian-buster",
       "peer-criteria": "DB-GROUP",
       "size": "${containerSize}",
       "port-mapping": [
