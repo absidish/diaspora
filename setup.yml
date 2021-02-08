@@ -1,131 +1,157 @@
 ---
-- hosts: all
+- name: Install diaspora
+  hosts: all
   remote_user: root
   become: yes
   vars_files:
     - vars/main.yml
-
   pre_tasks:
-    - name: Install git
-      package:
-        name: git
-        state: present
+    - name: Upgrade debian
+      apt:
+        update_cache: true
+        upgrade: true
 
-    - name: Install sudo
-      package:
-        name: sudo
-        state: present
+    - name: Installing required packages
+      apt:
+         pkg: ['build-essential', 'cmake', 'gnupg2', 'libssl-dev', 'libcurl4-openssl-dev', 'libxml2-dev', 'libxslt-dev', 'imagemagick', 'ghostscript', 'curl', 'libmagickwand-dev', 'git', 'libpq-dev', 'redis-server', 'python-psycopg2', 'nodejs', 'nginx', 'sudo']
 
 
-    - name: Install gnupg2
-      package:
-        name: gnupg2
-        state: present
+    - name: Add user diaspora
+      command: bash -lc 'adduser --disabled-password --gecos "" diaspora || echo "User already exists."'
 
-    - name: Install python-psycopg2
-      package:
-        name: python-psycopg2
-        state: present
+    - name: Add user diaspora to sudos
+      command: bash -lc "usermod -a -G sudo diaspora"
+
+    - name: Make the user sudoer with no password
+      lineinfile: "dest=/etc/sudoers state=present regexp='^%diaspora' line='%diaspora ALL=(ALL) NOPASSWD: ALL'"
 
   roles:
     - geerlingguy.postgresql
-    - { role: rvm.ruby,
-        tags: ruby,
-        rvm1_rubies: ['ruby-2.6'],
-        rvm1_user: 'diaspora'
-      }
 
   tasks:
-    - name: Add the user 'diaspora'
-      user:
-        name: diaspora
-        group: root
+    - name: Add an apt key for diaspora
+      command: bash -lc "gpg2 --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3 7D2BAF1CF37B13E2069D6956105BD0E739499BDB"
+      become: yes
+      become_user: diaspora
 
-    - name: Add an apt key by id for diaspora
-      apt_key:
-        url: https://rvm.io/mpapis.asc
-        state: present
+    - name: install rvm 
+      command: bash -lc "curl -sSL https://get.rvm.io | bash -s stable"
+      become: yes
+      become_user: diaspora
 
-    - name: Add an apt key by id for diaspora
-      apt_key:
-        url: https://rvm.io/pkuczynski.asc
-        state: present
+    - name: source rnv
+      command: bash -lc "source /home/diaspora/.rvm/scripts/rvm"
+      become: yes
+      become_user: diaspora
 
-    - name: git checkout from github diaspora  v0.7.14.0
+    - name: Git checkout from github diaspora  v0.7.14.0
       git:
         repo: https://github.com/diaspora/diaspora.git
         dest: /home/diaspora/diaspora
         version: v0.7.14.0
+      become: yes
+      become_user: diaspora
 
-    - name: copy database.yml
+    - name: RVM install 2.6
+      command: "/home/diaspora/.rvm/bin/rvm install 2.6"
+      become: yes
+      become_user: diaspora
+
+    - name: Execute gem install bundler
+      command: bash -lc "cd /home/diaspora/diaspora/; gem install bundler"
+      become: yes
+      become_user: diaspora
+
+    - name: Copy database.yml
       template:
         src: database.yml.j2
         dest: /home/diaspora/diaspora/config/database.yml
 
-    - name: copy diaspora.yml
+    - name: Copy diaspora.yml
       template:
         src: diaspora.yml.j2
         dest: /home/diaspora/diaspora/config/diaspora.yml
 
-    - name: Transfer setup rvm script
-      copy: src=setup_rvm.sh dest=/home/diaspora/setup_rvm.sh  mode=0777
-
-    - name: Execute install rvm script
-      command: /usr/bin/bash  /home/diaspora/setup_rvm.sh
-
-    - name: Execute source
-      command: /usr/bin/bash /etc/profile.d/rvm.sh
-      become: yes
-      become_user: diaspora
-
-    - name: Execute install rvm script
-      shell: "rvm install 2.6"
-      become: yes
-      become_user: diaspora
-
-    - name: Execute source
-      command: bash -lc "gem install bundler"
-      become: yes
-      become_user: diaspora
-
-    - name: Install the package "cmake"
-      apt:
-        name: cmake
-        state: present
-
-    - name: Install the package "cmake"
-      apt:
-        name: nodejs
-        state: present
-
-    - name: Execute source
+    - name: Execute configure_bundler
       command: bash -lc "cd /home/diaspora/diaspora; script/configure_bundler"
       become: yes
       become_user: diaspora
 
-    - name: Execute gem install rugged -v '0.99.0'
-      command: bash -lc "gem install rugged -v '0.99.0'"
-      become: yes
-      become_user: diaspora
-
-    - name: Execute gem install rugged -v '0.99.0'
-      command: bash -lc "gem install pg"
-      become: yes
-      become_user: diaspora
-
-    - name: Execute source
+    - name: Bundle install --full-index
       command: bash -lc "cd /home/diaspora/diaspora; bin/bundle install --full-index"
       become: yes
       become_user: diaspora
 
-    - name: /home/diaspora/diaspora
-      file:
-        path: /home/diaspora/diaspora
-        state: directory
-        recurse: yes
-        owner: diaspora
-
-    - name: Execute source
+    - name: DB migrate
       command: bash -lc "cd /home/diaspora/diaspora; RAILS_ENV=production bundle exec rake db:create db:migrate"
       become: yes
       become_user: diaspora
+
+
+    - name: Precompile
+      command: bash -lc "cd /home/diaspora/diaspora; RAILS_ENV=production bin/rake assets:precompile"
+      become: yes
+      become_user: diaspora
+
+
+    - name: Copy systemd diaspora.target
+      template:
+        src: diaspora.target
+        dest: /etc/systemd/system/diaspora.target
+
+    - name: Copy diaspora-web.service
+      template:
+        src: diaspora-web.service
+        dest: /etc/systemd/system/diaspora-web.service
+
+    - name: Copy diaspora-sidekiq.service
+      template:
+        src: diaspora-sidekiq.service
+        dest: /etc/systemd/system/diaspora-sidekiq.service
+
+    - name: Systemd to reread configs
+      systemd: daemon_reload=yes
+
+    - name: Enable and start diaspora.target
+      systemd:
+        name: diaspora.target
+        state: started
+        enabled: True
+
+    - name: Enable and start diaspora-web.service
+      systemd:
+        name: diaspora-web.service
+        state: started
+        enabled: True
+
+    - name: Enable and start diaspora-sidekiq.service
+      systemd:
+        name: diaspora-sidekiq.service
+        state: started
+        enabled: True
+
+    - name: Copy nginx config
+      template:
+        src: diasporanginx
+        dest: /etc/nginx/sites-available/diaspora
+
+    - name: Copy nginx config            
+      template:
+        src: diasporanginx           
+        dest: /etc/nginx/sites-enabled/diaspora
+
+    - name: Remove default nginx config 
+      file:
+        path: /etc/nginx/sites-available/default
+        state: absent
+
+    - name: Remove default nginx config
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Restart nginx
+      systemd:
+        name: nginx
+        state: restarted
+        enabled: True
