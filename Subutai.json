@@ -1,0 +1,80 @@
+{
+  "name": "${environmentName}",
+  "description": "Diaspora",
+  "version": "1.0.0",
+  "author": "https://github.com/absidish",
+  "containers": [
+    {
+      "hostname": "${hostname}",
+      "template": "debian-buaster",
+      "peer-criteria": "DB-GROUP",
+      "size": "${containerSize}",
+      "port-mapping": [
+        {
+          "protocol": "https",
+          "domain": "${domainName}",
+          "internal-port": "80",
+          "external-port": "443"
+        }
+      ]
+    }
+  ],
+  "peer-criteria": [
+    {
+      "name": "DB-GROUP"
+    }
+  ],
+  "ansible-configuration": {
+    "source-url": "https://github.com/absidish/diaspora/archive/master.zip",
+    "ansible-playbook": "setup.yml",
+    "extra-vars": [
+      {
+        "key": "hostname",
+        "value": "${hostname}"
+      },
+      {
+        "key": "password",
+        "value": "${password}"
+      }
+    ],
+    "groups": [
+      {
+        "name": "postgres",
+        "hostnames": [
+          "${hostname}"
+        ]
+      }
+    ]
+  },
+  "user-variables": {
+    "environmentName": {
+      "description": "Environment's name",
+      "type": "string",
+      "default": "postgres",
+      "validation": "[a-zA-Z0-9_]+"
+    },
+    "hostname": {
+      "description": "Hostname of the diaspora container",
+      "type": "string",
+      "default": "diaspora",
+      "validation": "[a-zA-Z0-9_]+"
+    },
+    "domainName": {
+      "description": "Enter the domain name",
+      "type": "domain",
+      "default": "change.the.domain",
+      "validation": "[a-zA-Z0-9]+"
+    },
+    "password": {
+      "description": "Postgres user password",
+      "type": "string",
+      "default": "secret"
+    },
+    "containerSize": {
+      "description": "Container Size",
+      "type": "enum",
+      "default": "LARGE",
+      "validation": "LARGE,HUGE"
+    }
+  }
+}
