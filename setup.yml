@@ -1,0 +1,131 @@
+---
+- hosts: all
+  remote_user: root
+  become: yes
+  vars_files:
+    - vars/main.yml
+
+  pre_tasks:
+    - name: Install git
+      package:
+        name: git
+        state: present
+
+    - name: Install sudo
+      package:
+        name: sudo
+        state: present
+
+
+    - name: Install gnupg2
+      package:
+        name: gnupg2
+        state: present
+
+    - name: Install python-psycopg2
+      package:
+        name: python-psycopg2
+        state: present
+
+  roles:
+    - geerlingguy.postgresql
+    - { role: rvm.ruby,
+        tags: ruby,
+        rvm1_rubies: ['ruby-2.6'],
+        rvm1_user: 'diaspora'
+      }
+
+  tasks:
+    - name: Add the user 'diaspora'
+      user:
+        name: diaspora
+        group: root
+
+    - name: Add an apt key by id for diaspora
+      apt_key:
+        url: https://rvm.io/mpapis.asc
+        state: present
+
+    - name: Add an apt key by id for diaspora
+      apt_key:
+        url: https://rvm.io/pkuczynski.asc
+        state: present
+
+    - name: git checkout from github diaspora  v0.7.14.0
+      git:
+        repo: https://github.com/diaspora/diaspora.git
+        dest: /home/diaspora/diaspora
+        version: v0.7.14.0
+
+    - name: copy database.yml
+      template:
+        src: database.yml.j2
+        dest: /home/diaspora/diaspora/config/database.yml
+
+    - name: copy diaspora.yml
+      template:
+        src: diaspora.yml.j2
+        dest: /home/diaspora/diaspora/config/diaspora.yml
+
+    - name: Transfer setup rvm script
+      copy: src=setup_rvm.sh dest=/home/diaspora/setup_rvm.sh  mode=0777
+
+    - name: Execute install rvm script
+      command: /usr/bin/bash  /home/diaspora/setup_rvm.sh
+
+    - name: Execute source
+      command: /usr/bin/bash /etc/profile.d/rvm.sh
+      become: yes
+      become_user: diaspora
+
+    - name: Execute install rvm script
+      shell: "rvm install 2.6"
+      become: yes
+      become_user: diaspora
+
+    - name: Execute source
+      command: bash -lc "gem install bundler"
+      become: yes
+      become_user: diaspora
+
+    - name: Install the package "cmake"
+      apt:
+        name: cmake
+        state: present
+
+    - name: Install the package "cmake"
+      apt:
+        name: nodejs
+        state: present
+
+    - name: Execute source
+      command: bash -lc "cd /home/diaspora/diaspora; script/configure_bundler"
+      become: yes
+      become_user: diaspora
+
+    - name: Execute gem install rugged -v '0.99.0'
+      command: bash -lc "gem install rugged -v '0.99.0'"
+      become: yes
+      become_user: diaspora
+
+    - name: Execute gem install rugged -v '0.99.0'
+      command: bash -lc "gem install pg"
+      become: yes
+      become_user: diaspora
+
+    - name: Execute source
+      command: bash -lc "cd /home/diaspora/diaspora; bin/bundle install --full-index"
+      become: yes
+      become_user: diaspora
+
+    - name: /home/diaspora/diaspora
+      file:
+        path: /home/diaspora/diaspora
+        state: directory
+        recurse: yes
+        owner: diaspora
+
+    - name: Execute source
+      command: bash -lc "cd /home/diaspora/diaspora; RAILS_ENV=production bundle exec rake db:create db:migrate"
+      become: yes
+      become_user: diaspora
