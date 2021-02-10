@@ -87,6 +87,8 @@
       become: yes
       become_user: diaspora
 
+    - name: Run redis server
+      command: bash -lc "redis-server --daemonize yes"
 
     - name: Precompile
       command: bash -lc "cd /home/diaspora/diaspora; RAILS_ENV=production bin/rake assets:precompile"
