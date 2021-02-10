@@ -1,1 +1,1 @@
-# Diaspora Subutai Bluepint
+# Diaspora Subutai Blueprint
